@@ -10,26 +10,15 @@ from training import train_i3d_model
     call_button='Train i3d Model',
     layout="vertical",
     max_epochs={'widget_type': 'SpinBox', 'label': 'Max Epochs', 
-                'min': 1, 'max': 100, 'value': 10},
+                'min': 1, 'max': 5, 'value': 5},
     batch_size={'widget_type': 'SpinBox', 'label': 'Batch Size', 
                 'min': 1, 'max': 128, 'value': 32},
-    learning_rate={'widget_type': 'FloatSpinBox', 'label': 'Learning Rate', 
-                   'min': 1e-6, 'max': 1e-2, 'step': 1e-6, 'value': 2e-5},
-    tile_size={'widget_type': 'SpinBox', 'label': 'Tile Size', 
-               'min': 32, 'max': 256, 'step': 32, 'value': 64},
-    in_chans={'widget_type': 'SpinBox', 'label': 'Input Channels', 
-              'min': 10, 'max': 65, 'step': 1, 'value': 30},
-    model_type={'widget_type': 'ComboBox', 'label': 'Model', 'choices': ['i3d','resnet3d'], 'value': 'i3d'},
     checkpoint_dir={'widget_type': 'FileEdit', 'label': 'Checkpoint Directory', 
                     'mode': 'd', 'value': './checkpoints'}
 )
 def train_i3d_widget(
-    max_epochs: int = 10,
+    max_epochs: int = 5,
     batch_size: int = 32,
-    learning_rate: float = 2e-5,
-    tile_size: int = 64,
-    in_chans: int = 30,
-    model_type: str = 'i3d',
     checkpoint_dir: str = './checkpoints'
 ):
     """Widget for training i3d model"""
@@ -68,19 +57,14 @@ def train_i3d_widget(
     print(f"\nStarting i3d training...")
     print(f"Epochs: {max_epochs}")
     print(f"Batch size: {batch_size}")
-    print(f"Learning rate: {learning_rate}")
-    print(f"Tile size: {tile_size}")
-    print(f"Input channels: {in_chans}")
+    # Input channels fixed to 24 in code
     
     try:
         best_checkpoint = train_i3d_model(
             viewer=viewer,
             max_epochs=max_epochs,
             batch_size=batch_size,
-            learning_rate=learning_rate,
-            tile_size=tile_size,
-            in_chans=in_chans,
-            model_type=model_type,
+            in_chans=24,
             checkpoint_dir=checkpoint_dir
         )
         

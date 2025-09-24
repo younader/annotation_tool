@@ -17,13 +17,9 @@ def get_data_layer_choices(viewer):
     model_path={"label": "Model Checkpoint", "widget_type": "FileEdit", 
                 "filter": "Checkpoint (*.ckpt *.pth *.pt)"},
     layer={"label": "Input Layer", "choices": get_data_layer_choices},
-    model_type={"label": "Model", "widget_type": "ComboBox", "choices": ["i3d", "resnet3d"], "value": "i3d"},
-    tile_size={"label": "Tile Size", "widget_type": "SpinBox", 
-               "min": 32, "max": 256, "step": 32, "value": 64},
+    # fixed model: resnet3d, and fixed tile size internal defaults
     stride={"label": "Stride (0=auto)", "widget_type": "SpinBox", 
             "min": 0, "max": 128, "step": 1, "value": 32},
-    in_chans={"label": "Input Channels", "widget_type": "SpinBox", 
-              "min": 10, "max": 65, "step": 1, "value": 30},
     batch_size={"label": "Batch Size", "widget_type": "SpinBox", 
                 "min": 1, "max": 256, "step": 1, "value": 16},
 )
@@ -31,10 +27,8 @@ def i3d_inference_widget(
     viewer: napari.Viewer,
     model_path: str,
     layer: napari.layers.Layer,
-    model_type: str = "i3d",
-    tile_size: int = 64,
+    # model_type fixed to resnet3d
     stride: int = 32,
-    in_chans: int = 30,
     batch_size: int = 16,
 ) -> Optional[napari.layers.Image]:
     
@@ -55,10 +49,9 @@ def i3d_inference_widget(
             viewer=viewer,
             layer=layer,
             checkpoint_path=model_path,
-            model_type=model_type,
-            tile_size=tile_size,
+            model_type='resnet3d',
             stride=stride,
-            in_chans=in_chans,
+            in_chans=24,
             batch_size=batch_size
         )
         

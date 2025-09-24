@@ -259,51 +259,7 @@ class I3DInferer:
         
         print(f"Processing {len(tiles)} tiles...")
 
-        # Save multiple sanity tiles and predictions with robust normalization
-        try:
-            from pathlib import Path
-            debug_dir = Path("debug_labels")
-            debug_dir.mkdir(exist_ok=True)
-            def _robust_vis(x2d: np.ndarray) -> np.ndarray:
-                p1, p99 = np.percentile(x2d, [1, 99])
-                if p99 <= p1:
-                    p1, p99 = float(x2d.min()), float(x2d.max())
-                denom = (p99 - p1) if (p99 - p1) > 1e-6 else 1.0
-                x = np.clip((x2d - p1) / denom, 0.0, 1.0)
-                return (x * 255.0).astype(np.uint8)
-
-            if len(tiles) > 0:
-                num_to_save = min(8, len(tiles))
-                # even spacing across tiles
-                idxs = np.linspace(0, len(tiles) - 1, num=num_to_save, dtype=int)
-
-                for k, idx in enumerate(idxs):
-                    t = tiles[idx]
-                    t_max = t.max(axis=2)
-                    t_vis = _robust_vis(t_max)
-                    cv2.imwrite(str(debug_dir / f"infer_tile_input_max_{k:02d}.png"), t_vis)
-
-                    with torch.no_grad():
-                        t_tensor = self._prepare_tile(t)
-                        if t_tensor is None:
-                            continue
-                        t_tensor = t_tensor.to(self.device)
-                        if self.device.type == 'cuda':
-                            with torch.cuda.amp.autocast(enabled=True):
-                                p = self.model(t_tensor)
-                        else:
-                            p = self.model(t_tensor)
-                        p = torch.sigmoid(p)
-                        p = F.interpolate(
-                            p,
-                            size=(self.tile_size, self.tile_size),
-                            mode='bilinear',
-                            align_corners=False
-                        ).squeeze(0).squeeze(0).detach().cpu().numpy()
-                        p_vis = (np.clip(p, 0.0, 1.0) * 255.0).astype(np.uint8)
-                        cv2.imwrite(str(debug_dir / f"infer_tile_pred_{k:02d}.png"), p_vis)
-        except Exception as e:
-            print(f"Warning: Could not save inference tile debug images: {e}")
+        # Debug export removed after validation phase
         
         # Batch process tiles with progress bar
         batch_size = self.batch_size
@@ -399,10 +355,10 @@ class I3DInferer:
 def run_i3d_inference(viewer: napari.Viewer, 
                     layer: napari.layers.Layer, 
                     checkpoint_path: str,
-                    model_type: str = 'i3d',
+                    model_type: str = 'resnet3d',
                     tile_size: int = 64,
                     stride: Optional[int] = None,
-                    in_chans: int = 30,
+                    in_chans: int = 24,
                     batch_size: int = 16) -> List[napari.layers.Layer]:
     """
     Run i3d model inference on a napari layer.
