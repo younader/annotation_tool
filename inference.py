@@ -58,8 +58,9 @@ class I3DModelLoader:
     Loader for InceptionI3d models from checkpoints.
     """
     
-    def __init__(self, checkpoint_path):
+    def __init__(self, checkpoint_path, enc: str = 'i3d'):
         self.checkpoint_path = Path(checkpoint_path)
+        self.encoder_type = enc
         
     def load(self):
         print(f"Loading checkpoint from {self.checkpoint_path}")
@@ -67,40 +68,47 @@ class I3DModelLoader:
         if not self.checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {self.checkpoint_path}")
         
-        # Try multiple import strategies
-        try:
-            from models.i3dallnl import InceptionI3d
-            print("Successfully imported InceptionI3d from models.i3dallnl")
-        except ImportError:
+        # Try multiple import strategies based on encoder type
+        if self.encoder_type == 'i3d':
             try:
-                # Try relative import from training module
-                from .training import I3DLightningModel
-                print("Using I3DLightningModel from training module")
-                
-                # Load the lightning checkpoint
-                model = I3DLightningModel.load_from_checkpoint(
-                    self.checkpoint_path,
-                    learning_rate=2e-5,
-                    in_channels=1,
-                    size=64
-                )
-                
-                device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-                model = model.to(device)
-                model.eval()
-                
-                print(f"Model loaded and moved to {device}")
-                return model
-                
-            except Exception as e:
-                print(f"Could not load from training module: {e}")
-                # Create a dummy InceptionI3d class
-                print("Creating InceptionI3d model from scratch")
-                from .i3d_standalone import InceptionI3d
+                from models.i3dallnl import InceptionI3d
+                print("Successfully imported InceptionI3d from models.i3dallnl")
+            except ImportError:
+                try:
+                    from .training import I3DLightningModel
+                    print("Using I3DLightningModel from training module")
+                    model = I3DLightningModel.load_from_checkpoint(
+                        self.checkpoint_path,
+                        learning_rate=2e-5,
+                        in_channels=1,
+                        size=64,
+                        enc='i3d'
+                    )
+                    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                    model = model.to(device)
+                    model.eval()
+                    print(f"Model loaded and moved to {device}")
+                    return model
+                except Exception as e:
+                    print(f"Could not load from training module: {e}")
+                    print("Creating InceptionI3d model from scratch")
+                    from .i3d_standalone import InceptionI3d
+        else:
+            # resnet3d path
+            try:
+                from models.resnetall import generate_model
+                print("Successfully imported resnet3d generate_model")
+            except ImportError as e:
+                print(f"Failed to import resnet3d: {e}")
+                raise
         
         # Create model instance
-        print("Creating InceptionI3d model instance...")
-        model = InceptionI3d(in_channels=1, num_classes=512, non_local=True)
+        if self.encoder_type == 'i3d':
+            print("Creating InceptionI3d model instance...")
+            model = InceptionI3d(in_channels=1, num_classes=512, non_local=True)
+        else:
+            print("Creating resnet3d model instance...")
+            model = generate_model(model_depth=50, n_input_channels=1, forward_features=True, n_classes=1039)
         
         # Build decoder
         print("Building decoder...")
@@ -133,12 +141,11 @@ class I3DModelLoader:
             print("Weights loaded successfully")
         except Exception as e:
             print(f"Warning: Could not load full state dict: {e}")
-            # Try loading just the backbone
             try:
                 model.load_state_dict(state_dict, strict=False)
                 print("Loaded weights into backbone only")
-            except:
-                print("Could not load weights, using random initialization")
+            except Exception as e2:
+                print(f"Could not load weights, using random initialization: {e2}")
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         full_model = full_model.to(device)
@@ -392,6 +399,7 @@ class I3DInferer:
 def run_i3d_inference(viewer: napari.Viewer, 
                     layer: napari.layers.Layer, 
                     checkpoint_path: str,
+                    model_type: str = 'i3d',
                     tile_size: int = 64,
                     stride: Optional[int] = None,
                     in_chans: int = 30,
@@ -410,7 +418,7 @@ def run_i3d_inference(viewer: napari.Viewer,
     
     # Load model
     try:
-        loader = I3DModelLoader(checkpoint_path)
+        loader = I3DModelLoader(checkpoint_path, enc=model_type)
         model = loader.load()
     except Exception as e:
         print(f"Error loading model: {e}")

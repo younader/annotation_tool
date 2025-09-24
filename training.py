@@ -615,7 +615,8 @@ class I3DLightningModel(pl.LightningModule):
     def __init__(self, 
                  learning_rate: float = 2e-5,
                  in_channels: int = 1,
-                 size: int = 64):
+                 size: int = 64,
+                 enc: str = 'i3d'):
         super().__init__()
         
         self.save_hyperparameters()
@@ -630,8 +631,19 @@ class I3DLightningModel(pl.LightningModule):
             # You can add a fallback or dummy model here
             from .i3d_model import InceptionI3d  # Assuming you have a local copy
         
-        # Create model
-        self.backbone = InceptionI3d(in_channels=in_channels, num_classes=512, non_local=True)
+        # Create model backbone based on encoder type
+        self.encoder_type = enc
+        if self.encoder_type == 'i3d':
+            self.backbone = InceptionI3d(in_channels=in_channels, num_classes=512, non_local=True)
+        else:
+            # resnet3d style backbone
+            try:
+                from models.resnetall import generate_model
+            except Exception as e:
+                print(f"Error importing resnet3d generator: {e}")
+                raise
+            # Default to depth-50 forward_features=True
+            self.backbone = generate_model(model_depth=50, n_input_channels=1, forward_features=True, n_classes=1039)
         
         # Create decoder - use dummy input to get encoder dimensions
         with torch.no_grad():
@@ -682,6 +694,7 @@ def train_i3d_model(viewer: napari.Viewer,
                    learning_rate: float = 2e-5,
                    tile_size: int = 64,
                    in_chans: int = 30,
+                   model_type: str = 'i3d',
                    checkpoint_dir: str = "./checkpoints"):
     """
     Train i3d model on napari data
@@ -768,9 +781,10 @@ def train_i3d_model(viewer: napari.Viewer,
     # Create model
     model = I3DLightningModel(
         learning_rate=learning_rate,
-        size=tile_size
+        size=tile_size,
+        enc=model_type
     )
-    model.load_state_dict(torch.load('./wild12_64_Frag3_0_fr_i3depoch=9.ckpt',weights_only=False)['state_dict'])
+    model.load_state_dict(torch.load('./ted_20250807020208_0_fr_i3depoch=18.ckpt',weights_only=False)['state_dict'])
     # Create trainer
     checkpoint_callback = ModelCheckpoint(
         dirpath=checkpoint_dir,

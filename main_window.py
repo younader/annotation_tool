@@ -19,6 +19,7 @@ from training import train_i3d_model
                'min': 32, 'max': 256, 'step': 32, 'value': 64},
     in_chans={'widget_type': 'SpinBox', 'label': 'Input Channels', 
               'min': 10, 'max': 65, 'step': 1, 'value': 30},
+    model_type={'widget_type': 'ComboBox', 'label': 'Model', 'choices': ['i3d','resnet3d'], 'value': 'i3d'},
     checkpoint_dir={'widget_type': 'FileEdit', 'label': 'Checkpoint Directory', 
                     'mode': 'd', 'value': './checkpoints'}
 )
@@ -28,6 +29,7 @@ def train_i3d_widget(
     learning_rate: float = 2e-5,
     tile_size: int = 64,
     in_chans: int = 30,
+    model_type: str = 'i3d',
     checkpoint_dir: str = './checkpoints'
 ):
     """Widget for training i3d model"""
@@ -78,6 +80,7 @@ def train_i3d_widget(
             learning_rate=learning_rate,
             tile_size=tile_size,
             in_chans=in_chans,
+            model_type=model_type,
             checkpoint_dir=checkpoint_dir
         )
         
