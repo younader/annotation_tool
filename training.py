@@ -110,12 +110,10 @@ class NapariI3DDataset(Dataset):
             if label_layer is None:
                 continue
                 
-            # Get data - make copies to avoid reference issues
-            orig_image = np.array(img_layer.data)
-            image = orig_image.astype(np.float32)
-            # If the source image is uint16, rescale to approx uint8 range
-            if orig_image.dtype == np.uint16:
-                image = image / 257.0
+            # Get data - avoid extra copies; keep integer dtype until tiles
+            orig_image = np.asarray(img_layer.data)
+            image = orig_image  # lazy float conversion will happen per-tile in __getitem__
+            # Note: scaling for uint16 -> uint8 will also be applied per-tile
             mask = np.array(label_layer.data, dtype=np.float32)
             
             
@@ -218,8 +216,7 @@ class NapariI3DDataset(Dataset):
             image = np.pad(image, ((0, pad0), (0, pad1), (0, 0)), constant_values=0)
             mask = np.pad(mask, ((0, pad0), (0, pad1)), constant_values=0)
             
-            # Clip image values to full uint8 dynamic range after rescaling
-            image = np.clip(image, 0, 255)
+            # Do not clip here; scaling to uint8 happens per-tile in __getitem__
             
             # Generate large tiles
             x1_list = list(range(0, image.shape[1] - self.large_tile_size + 1, self.stride))
@@ -445,7 +442,7 @@ class NapariI3DDataset(Dataset):
     
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        image = sample['image'].copy()  # Make a copy
+        image = sample['image']  # defer copy until after scaling/casting
         mask = sample['mask'].copy()
         mask = mask[:, :, None]  # Add channel dimension for transform
         
@@ -453,6 +450,21 @@ class NapariI3DDataset(Dataset):
         if self.mode == 'train' and random.random() < 0.3:
             image = self.fourth_augment(image)
         
+        # Convert tile to uint8 in 0..255 range; normalization to 0..1 is done by Albumentations Normalize
+        if image.dtype == np.uint16:
+            # Map 16-bit to 8-bit with integer division for stability
+            image = (image // 257).astype(np.uint8)
+        elif np.issubdtype(image.dtype, np.floating):
+            # If float image: assume 0..1 if max<=1.5, otherwise clip to 0..255
+            vmax = float(image.max()) if image.size > 0 else 1.0
+            if vmax <= 1.5:
+                image = (np.clip(image, 0.0, 1.0) * 255.0).astype(np.uint8)
+            else:
+                image = np.clip(image, 0.0, 255.0).astype(np.uint8)
+        else:
+            # Other integer types
+            image = np.clip(image, 0, 255).astype(np.uint8)
+
         # Apply augmentation
         if self.transform:
             transformed = self.transform(image=image, mask=mask)
